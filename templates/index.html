@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="hero">
+    <h1>{{ message }}</h1>
+    <p>This is a skeleton FastAPI application with Jinja2 templating support.</p>
+</div>
+
+<section class="features">
+    <h2>Features</h2>
+    <div class="feature-grid">
+        <div class="feature-card">
+            <h3>🚀 FastAPI</h3>
+            <p>Modern, fast (high-performance) web framework for building APIs with Python 3.12+</p>
+        </div>
+        <div class="feature-card">
+            <h3>📄 Jinja2 Templates</h3>
+            <p>Powerful template engine for rendering dynamic HTML pages</p>
+        </div>
+        <div class="feature-card">
+            <h3>🎨 Static Files</h3>
+            <p>Support for serving CSS, JavaScript, and other static assets</p>
+        </div>
+        <div class="feature-card">
+            <h3>📡 API Endpoints</h3>
+            <p>RESTful API endpoints alongside HTML pages</p>
+        </div>
+    </div>
+</section>
+
+<section class="quick-start">
+    <h2>Quick Start</h2>
+    <div class="code-block">
+        <pre><code># Install dependencies
+uv sync
+
+# Run the application
+python main.py
+
+# Or use uvicorn directly
+uvicorn main:app --reload</code></pre>
+    </div>
+</section>
+{% endblock %}

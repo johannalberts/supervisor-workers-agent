@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-header">
+    <h1>About This Project</h1>
+</div>
+
+<section class="about-content">
+    <p>{{ description }}</p>
+    
+    <h2>Technology Stack</h2>
+    <ul class="tech-list">
+        <li><strong>FastAPI</strong> - Modern web framework for building APIs</li>
+        <li><strong>Jinja2</strong> - Template engine for dynamic HTML rendering</li>
+        <li><strong>Uvicorn</strong> - ASGI server for running the application</li>
+        <li><strong>Python 3.12+</strong> - Programming language</li>
+    </ul>
+
+    <h2>Project Structure</h2>
+    <div class="code-block">
+        <pre><code>supervisor-workers-agent/
+├── main.py              # FastAPI application entry point
+├── templates/           # Jinja2 HTML templates
+│   ├── base.html       # Base template
+│   ├── index.html      # Home page
+│   └── about.html      # About page
+├── static/             # Static files (CSS, JS, images)
+│   ├── css/
+│   │   └── style.css
+│   └── js/
+├── pyproject.toml      # Project dependencies
+└── README.md           # Documentation</code></pre>
+    </div>
+
+    <h2>API Endpoints</h2>
+    <ul class="api-list">
+        <li><code>GET /</code> - Home page (HTML)</li>
+        <li><code>GET /about</code> - About page (HTML)</li>
+        <li><code>GET /api/health</code> - Health check endpoint (JSON)</li>
+        <li><code>GET /api/data</code> - Sample data endpoint (JSON)</li>
+    </ul>
+</section>
+{% endblock %}
