@@ -1,44 +1,100 @@
 {% extends "base.html" %}
 
+{% block extra_css %}
+<style>
+    /* Override base styles for chat interface */
+    .main-content {
+        padding: 0;
+        height: calc(100vh - 60px);
+    }
+    
+    .container {
+        height: 100%;
+        max-width: 100%;
+        padding: 0;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="hero">
-    <h1>{{ message }}</h1>
-    <p>This is a skeleton FastAPI application with Jinja2 templating support.</p>
+<div class="chat-container">
+    <!-- Chat Header -->
+    <div class="chat-header">
+        <div class="agent-info">
+            <div class="agent-avatar">
+                <span>🤖</span>
+            </div>
+            <div class="agent-details">
+                <h2>Customer Service Assistant</h2>
+                <span class="agent-status">
+                    <span class="status-indicator online"></span>
+                    Online
+                </span>
+            </div>
+        </div>
+        <div class="chat-actions">
+            <button class="action-btn" title="Clear Chat" onclick="clearChat()">
+                <span>🗑️</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Chat Messages Area -->
+    <div class="chat-messages" id="chatMessages">
+        <!-- Welcome Message -->
+        <div class="message bot-message">
+            <div class="message-avatar">🤖</div>
+            <div class="message-content">
+                <div class="message-bubble">
+                    <p>Hello! 👋 I'm your customer service assistant. How can I help you today?</p>
+                </div>
+                <div class="message-time">Just now</div>
+            </div>
+        </div>
+
+        <!-- Sample bot message with options -->
+        <div class="message bot-message">
+            <div class="message-avatar">🤖</div>
+            <div class="message-content">
+                <div class="message-bubble">
+                    <p>I can help you with:</p>
+                    <ul class="help-list">
+                        <li>Product information</li>
+                        <li>Order status</li>
+                        <li>Returns & refunds</li>
+                        <li>Technical support</li>
+                        <li>Account management</li>
+                    </ul>
+                </div>
+                <div class="message-time">Just now</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chat Input Area -->
+    <div class="chat-input-container">
+        <div class="chat-input-wrapper">
+            <textarea 
+                id="messageInput" 
+                class="chat-input" 
+                placeholder="Type your message here..."
+                rows="1"
+                onkeydown="handleKeyDown(event)"
+            ></textarea>
+            <button class="send-button" onclick="sendMessage()" id="sendButton">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                    <path d="M22 2L11 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+        </div>
+        <div class="input-hint">
+            Press Enter to send, Shift+Enter for new line
+        </div>
+    </div>
 </div>
+{% endblock %}
 
-<section class="features">
-    <h2>Features</h2>
-    <div class="feature-grid">
-        <div class="feature-card">
-            <h3>🚀 FastAPI</h3>
-            <p>Modern, fast (high-performance) web framework for building APIs with Python 3.12+</p>
-        </div>
-        <div class="feature-card">
-            <h3>📄 Jinja2 Templates</h3>
-            <p>Powerful template engine for rendering dynamic HTML pages</p>
-        </div>
-        <div class="feature-card">
-            <h3>🎨 Static Files</h3>
-            <p>Support for serving CSS, JavaScript, and other static assets</p>
-        </div>
-        <div class="feature-card">
-            <h3>📡 API Endpoints</h3>
-            <p>RESTful API endpoints alongside HTML pages</p>
-        </div>
-    </div>
-</section>
-
-<section class="quick-start">
-    <h2>Quick Start</h2>
-    <div class="code-block">
-        <pre><code># Install dependencies
-uv sync
-
-# Run the application
-python main.py
-
-# Or use uvicorn directly
-uvicorn main:app --reload</code></pre>
-    </div>
-</section>
+{% block extra_js %}
+<script src="{{ url_for('static', path='/js/chat.js') }}"></script>
 {% endblock %}
