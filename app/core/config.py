@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     port: int = 8000
     reload: bool = True
     
+    # MongoDB settings
+    mongodb_url: str = "mongodb://localhost:27017"
+    mongodb_db_name: str = "chatbot"
+    
     # Paths
     base_dir: Path = Path(__file__).resolve().parent.parent.parent
     templates_dir: Path = base_dir / "templates"

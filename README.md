@@ -50,17 +50,41 @@ supervisor-workers-agent/
 
 ## Running the Application
 
-### Method 1: Using Python directly
+### Local Development
+
+#### Method 1: Using run.py
 
 ```bash
-python main.py
+python run.py
 ```
 
-### Method 2: Using uvicorn
+#### Method 2: Using uvicorn directly
 
 ```bash
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
+
+### Docker Deployment
+
+#### Quick Start
+```bash
+# Build and start all services (FastAPI + MongoDB + Mongo Express)
+docker-compose up -d --build
+
+# View logs
+docker-compose logs -f
+
+# Stop services
+docker-compose down
+```
+
+#### Services
+- **Web App**: http://localhost:8000
+- **API Docs**: http://localhost:8000/docs
+- **Mongo Express**: http://localhost:8081 (admin/admin123)
+- **MongoDB**: localhost:27017
+
+For detailed Docker instructions, see [DOCKER.md](DOCKER.md).
 
 The application will be available at:
 - **Home page**: http://localhost:8000
