@@ -5,7 +5,8 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
-from app.routers import api, pages
+from app.core.database import connect_to_mongo, close_mongo_connection
+from app.routers import api, pages, auth
 
 
 def create_application() -> FastAPI:
@@ -33,6 +34,7 @@ def create_application() -> FastAPI:
     
     # Include routers
     app.include_router(pages.router)
+    app.include_router(auth.router)
     app.include_router(api.router)
     
     return app
@@ -48,6 +50,7 @@ async def startup_event():
     Actions to perform on application startup
     """
     print(f"🚀 {settings.app_name} v{settings.app_version} is starting...")
+    await connect_to_mongo()
     print(f"📚 API Documentation: http://{settings.host}:{settings.port}/docs")
 
 
@@ -56,4 +59,5 @@ async def shutdown_event():
     """
     Actions to perform on application shutdown
     """
+    await close_mongo_connection()
     print(f"👋 {settings.app_name} is shutting down...")

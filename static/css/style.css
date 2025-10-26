@@ -68,6 +68,35 @@ body {
     opacity: 0.8;
 }
 
+.nav-menu .nav-signup {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    transition: all 0.3s;
+}
+
+.nav-menu .nav-signup:hover {
+    background: rgba(255, 255, 255, 0.3);
+    opacity: 1;
+}
+
+.nav-menu .nav-user {
+    color: var(--white);
+    opacity: 0.9;
+}
+
+.nav-menu .nav-logout {
+    background: rgba(255, 255, 255, 0.15);
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    transition: all 0.3s;
+}
+
+.nav-menu .nav-logout:hover {
+    background: rgba(255, 100, 100, 0.5);
+    opacity: 1;
+}
+
 /* Main Content */
 .main-content {
     min-height: calc(100vh - 200px);

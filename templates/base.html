@@ -16,7 +16,13 @@
             <ul class="nav-menu">
                 <li><a href="/">Home</a></li>
                 <li><a href="/about">About</a></li>
-                <li><a href="/api/health">API Health</a></li>
+                {% if user %}
+                    <li><span class="nav-user">👤 {{ user.first_name }}</span></li>
+                    <li><a href="/auth/logout" class="nav-logout">Logout</a></li>
+                {% else %}
+                    <li><a href="/auth/login">Log In</a></li>
+                    <li><a href="/auth/signup" class="nav-signup">Sign Up</a></li>
+                {% endif %}
             </ul>
         </div>
     </nav>

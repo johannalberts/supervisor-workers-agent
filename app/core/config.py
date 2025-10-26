@@ -22,6 +22,11 @@ class Settings(BaseSettings):
     mongodb_url: str = "mongodb://localhost:27017"
     mongodb_db_name: str = "chatbot"
     
+    # JWT settings
+    secret_key: str = "your-secret-key-change-this-in-production-min-32-chars"
+    algorithm: str = "HS256"
+    access_token_expire_minutes: int = 30
+    
     # Paths
     base_dir: Path = Path(__file__).resolve().parent.parent.parent
     templates_dir: Path = base_dir / "templates"
