@@ -140,5 +140,13 @@ function clearChat() {
     }
 }
 
+// Handle quick reply button clicks
+function handleQuickReply(message) {
+    // Set the message in the input
+    messageInput.value = message;
+    // Trigger send
+    sendMessage();
+}
+
 // Initial scroll to bottom
 scrollToBottom();
