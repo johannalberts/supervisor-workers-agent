@@ -1,37 +1,51 @@
 # Supervisor Workers Agent
 
-A FastAPI-based customer service chatbot application with a **supervisor-workers architecture** powered by LangGraph. The agent handles returns and refunds end-to-end using a deterministic, state-based workflow.
+A FastAPI-based customer service chatbot application with a **supervisor-workers architecture** powered by LangGraph. The agent handles returns and refunds end-to-end using a deterministic, state-based workflow with **persistent state management** via MongoDB checkpointing.
 
 ## Features
 
 - 🤖 **LangGraph Agent** - Supervisor-workers architecture for customer service
-- 🔄 **Return/Refund Processing** - Automated handling of return and refund requests
+- � **State Persistence** - MongoDB checkpointing for conversation continuity across sessions
+- �🔄 **Return/Refund Processing** - Automated handling of return and refund requests
 - 📋 **Order Lookup** - Integration with MongoDB for order data
-- ✅ **Policy Enforcement** - Deterministic eligibility checking
+- ✅ **Policy Enforcement** - Deterministic eligibility checking (30-day return, 14-day refund)
 - 🎫 **Ticket Management** - Idempotent return/refund ticket creation
 - 📧 **Email Notifications** - Confirmation emails (mock implementation)
 - 🔐 **Authentication** - JWT-based user authentication with cookies
-- 💬 **Modern Chat UI** - Real-time chat interface
+- 💬 **Modern Chat UI** - Real-time chat interface with quick-reply buttons
 - 🚀 **FastAPI** - Modern, fast web framework
 - 📄 **Jinja2 Templates** - Dynamic HTML page rendering
 - 🐳 **Docker** - Containerized deployment with MongoDB
 
 ## Architecture
 
-The agent follows a **supervisor → workers** pattern:
+The agent follows a **supervisor → workers** pattern with **singleton graph + global checkpointer** (enterprise-scale pattern):
 
-1. **Supervisor** - Routes between workers based on state
+### Key Components
+
+1. **Supervisor** - Deterministic routing between workers based on state
 2. **Workers** - Specialized nodes for specific tasks:
    - `ClassifyIntentWorker` - Classifies user intent (return/refund/other)
    - `SlotFillerWorker` - Extracts or asks for order number
    - `OrderLookupWorker` - Fetches order from MongoDB
-   - `ConfirmDetailsWorker` - Confirms order with user
+   - `ConfirmDetailsWorker` - Confirms order with user (with formatted display)
    - `PolicyCheckWorker` - Checks return/refund eligibility
    - `DecideActionWorker` - Determines which action to take
    - `ProcessReturnWorker` - Creates return (RMA) ticket
    - `ProcessRefundWorker` - Creates refund ticket
    - `EmailWorker` - Sends confirmation email
-   - `FinalizeWorker` - Provides final summary
+   - `FinalizeWorker` - Provides final summary or denial message
+3. **Checkpointer** - MongoDBSaver for persistent conversation state
+4. **Human-in-the-Loop** - Automatic pausing when agent asks questions
+
+### State Persistence
+
+The agent uses **LangGraph's MongoDBSaver** for checkpointing:
+- **Singleton graph**: Created once at startup, reused for all requests
+- **Global checkpointer**: Single MongoDBSaver instance shared across all sessions
+- **Thread isolation**: Each conversation identified by unique `thread_id`
+- **Message reducer**: `add_messages` reducer appends messages across turns
+- **Automatic state loading**: Previous conversation state restored on each turn
 
 See [AGENT-INFO.md](AGENT-INFO.md) for detailed specifications.
 
@@ -116,17 +130,31 @@ python run.py
 ### Chatbot Flow Example
 
 1. **Visit** http://localhost:8000 and log in
-2. **Start conversation**: "I want to return my order"
-3. **Provide order number**: "ORD-20241001-001"
-4. **Confirm details**: "Yes"
-5. **Receive ticket**: The agent creates a return ticket and provides next steps
+2. **Choose quick action**: Click "🔄 Returns & refunds" button (or type your message)
+3. **Provide order number**: "ORD-2024-001"
+4. **Review order details**: Agent shows formatted order with items, dates, and total
+5. **Confirm details**: Reply "yes"
+6. **Eligibility check**: Agent verifies policy (30-day return window)
+7. **Receive outcome**: 
+   - If eligible: Return/refund ticket created with next steps
+   - If not eligible: Clear explanation of why (e.g., "Outside 30-day return window")
 
 ### Sample Order Numbers
 
-The database includes 10 sample orders:
-- `ORD-20241001-001` through `ORD-20241001-010`
+The database includes 10 sample orders for testing:
+- `ORD-2024-001` - Recent order (eligible)
+- `ORD-2024-002` through `ORD-2024-010` - Various scenarios
 
-Try them to test different eligibility scenarios!
+**Note**: Orders from 2024 fixtures are outside the 30-day window as of October 2025, so they'll be denied. For testing eligibility, you may need to update fixture dates or adjust policy settings.
+
+### Quick Reply Buttons
+
+The chat interface includes interactive buttons for common tasks:
+- 📦 Product information (coming soon)
+- 📋 Order status (coming soon)
+- 🔄 **Returns & refunds** ← Active! Triggers return flow
+- 🔧 Technical support (coming soon)
+- 👤 Account management (coming soon)
 
 ### API Endpoints
 
@@ -236,26 +264,83 @@ See [DOCKER.md](DOCKER.md) for production deployment guide.
 
 ### Agent not responding
 - Check OpenAI API key is set correctly in `.env`
-- View logs: `docker compose logs web`
+- View logs: `docker compose logs -f web`
 - Verify MongoDB is running: `docker compose ps`
 
 ### Orders not found
 - Load fixtures: `docker compose exec web python scripts/load_fixtures.py`
 - Check MongoDB: Visit http://localhost:8081
+- Verify collection exists: `db.orders.find()`
+
+### State not persisting between messages
+- Check MongoDBSaver is initialized: Look for `✅ Checkpointer initialized` in logs
+- Verify checkpoints collection exists in MongoDB
+- Ensure `thread_id` (session_id) is being passed correctly
+- Check messages use LangChain message types (HumanMessage, AIMessage)
+
+### Recursion limit errors
+- Check supervisor routing logic for infinite loops
+- Verify workers return proper state updates
+- Ensure field names match between workers and supervisor (e.g., `user_confirmed_order`)
 
 ### Authentication issues
 - Clear browser cookies
 - Check JWT secret key is set in `.env`
 
+### Display issues (newlines not showing)
+- Frontend converts `\n` to `<br>` automatically
+- Check `chat.js` has: `htmlText.replace(/\n/g, '<br>')`
+
 ## Dependencies
 
 - **fastapi** - Web framework
 - **langgraph** - Agent workflow orchestration
+- **langgraph-checkpoint-mongodb** - MongoDB checkpointing for state persistence
 - **langchain-openai** - OpenAI integration
-- **motor** - Async MongoDB driver
-- **pymongo** - MongoDB driver
+- **langchain-core** - Core LangChain primitives (messages, runnables)
+- **motor** - Async MongoDB driver (for data operations)
+- **pymongo** - Sync MongoDB driver (required for MongoDBSaver)
 - **bcrypt** - Password hashing
 - **python-jose** - JWT tokens
+- **pydantic-settings** - Settings management
+
+## Architecture Deep Dive
+
+### Checkpointing Pattern
+
+This implementation uses the **enterprise-scale singleton pattern**:
+
+```python
+# Global singleton (created once at startup)
+_graph_instance = None
+checkpointer = MongoDBSaver(sync_client, db_name, "checkpoints")
+
+# Reused for all requests
+graph = create_agent_graph(llm, db, checkpointer)
+
+# Thread isolation via config
+result = await graph.ainvoke(
+    {"messages": [new_message]},
+    config={"configurable": {"thread_id": session_id}}
+)
+```
+
+**Key Points:**
+- One graph instance serves all requests (optimal performance)
+- One checkpointer instance manages all conversation states
+- Thread IDs isolate different conversations
+- Messages use `add_messages` reducer for proper appending
+- State automatically loads/saves on each turn
+
+### Human-in-the-Loop
+
+The supervisor detects questions and routes to `__end__`:
+```python
+if "?" in last_message or "please" in last_message.lower():
+    return "__end__"  # Pause for user input
+```
+
+This prevents infinite loops and ensures proper turn-taking.
 
 ## License
 
@@ -263,9 +348,15 @@ MIT License
 
 ## Next Steps
 
-- [ ] Add more worker types (FAQ, product info)
-- [ ] Implement real email service
-- [ ] Add conversation analytics
-- [ ] Deploy to production
-- [ ] Add unit tests for workers
-- [ ] Implement human handoff
+- [x] ~~State persistence with MongoDB checkpointing~~
+- [x] ~~Human-in-the-loop for turn-taking~~
+- [x] ~~Quick reply buttons for common actions~~
+- [x] ~~Formatted order display with bullet points~~
+- [ ] Add more worker types (FAQ, product info, order tracking)
+- [ ] Implement real email service (SendGrid, AWS SES)
+- [ ] Add conversation analytics dashboard
+- [ ] Deploy to production (Railway, Render, AWS)
+- [ ] Add comprehensive unit tests for workers
+- [ ] Implement human handoff to live agent
+- [ ] Add support for multiple languages
+- [ ] Performance monitoring and observability
