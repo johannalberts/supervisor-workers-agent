@@ -37,20 +37,34 @@ async def finalize_worker(state: AgentState) -> Dict[str, Any]:
         masked_email = "***"
     
     # Build final message
+    # Handle explicit cancel
     if desired_action == "cancel":
         final_message = "Thank you for contacting us. If you have any other questions, feel free to reach out!"
+    # Handle case where no desired action was set (e.g., not eligible)
+    elif not desired_action:
+        eligibility = state.get("eligibility") or {}
+        # If eligibility was computed and neither return nor refund is available
+        if eligibility and not eligibility.get("is_return_eligible") and not eligibility.get("is_refund_eligible"):
+            reason = eligibility.get("reason", "Not eligible under our policy.")
+            final_message = (
+                f"I'm sorry — this order isn't eligible for return or refund. Reason: {reason}"
+            )
+        else:
+            # Generic fallback
+            final_message = "Thank you. We've completed the check. If you need further help, please let us know."
     else:
+        # We have a desired action and should summarize the created ticket
         email_note = ""
         if email_status == "sent":
-            email_note = f" I've emailed **{masked_email}** with the details and next steps."
+            email_note = f" I've emailed {masked_email} with the details and next steps."
         elif email_status == "failed":
             email_note = " Note: There was an issue sending the confirmation email, but your ticket has been created."
-        
+
         final_message = (
-            f"✅ All done! I've created a **{desired_action}** ticket **{ticket_id}** for your order.{email_note}\n\n"
+            f"✅ All done! I've created a {desired_action} ticket {ticket_id} for your order.{email_note}\n\n"
             f"**Next steps:**\n"
         )
-        
+
         if desired_action == "return":
             final_message += (
                 "1. Package your items securely\n"
