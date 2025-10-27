@@ -1,30 +1,66 @@
 # Supervisor Workers Agent
 
-A FastAPI application with Jinja2 templating support for serving dynamic HTML pages alongside RESTful API endpoints.
+A FastAPI-based customer service chatbot application with a **supervisor-workers architecture** powered by LangGraph. The agent handles returns and refunds end-to-end using a deterministic, state-based workflow.
 
 ## Features
 
-- 🚀 **FastAPI** - Modern, fast web framework for building APIs
-- 📄 **Jinja2 Templates** - Dynamic HTML page rendering with template inheritance
-- 🎨 **Static Files** - Support for CSS, JavaScript, and other static assets
-- 📡 **API & HTML** - Serve both API endpoints and HTML pages from the same application
-- 🔄 **Hot Reload** - Automatic reload during development
+- 🤖 **LangGraph Agent** - Supervisor-workers architecture for customer service
+- 🔄 **Return/Refund Processing** - Automated handling of return and refund requests
+- 📋 **Order Lookup** - Integration with MongoDB for order data
+- ✅ **Policy Enforcement** - Deterministic eligibility checking
+- 🎫 **Ticket Management** - Idempotent return/refund ticket creation
+- 📧 **Email Notifications** - Confirmation emails (mock implementation)
+- 🔐 **Authentication** - JWT-based user authentication with cookies
+- 💬 **Modern Chat UI** - Real-time chat interface
+- 🚀 **FastAPI** - Modern, fast web framework
+- 📄 **Jinja2 Templates** - Dynamic HTML page rendering
+- 🐳 **Docker** - Containerized deployment with MongoDB
+
+## Architecture
+
+The agent follows a **supervisor → workers** pattern:
+
+1. **Supervisor** - Routes between workers based on state
+2. **Workers** - Specialized nodes for specific tasks:
+   - `ClassifyIntentWorker` - Classifies user intent (return/refund/other)
+   - `SlotFillerWorker` - Extracts or asks for order number
+   - `OrderLookupWorker` - Fetches order from MongoDB
+   - `ConfirmDetailsWorker` - Confirms order with user
+   - `PolicyCheckWorker` - Checks return/refund eligibility
+   - `DecideActionWorker` - Determines which action to take
+   - `ProcessReturnWorker` - Creates return (RMA) ticket
+   - `ProcessRefundWorker` - Creates refund ticket
+   - `EmailWorker` - Sends confirmation email
+   - `FinalizeWorker` - Provides final summary
+
+See [AGENT-INFO.md](AGENT-INFO.md) for detailed specifications.
 
 ## Project Structure
 
 ```
 supervisor-workers-agent/
-├── main.py              # FastAPI application entry point
-├── templates/           # Jinja2 HTML templates
-│   ├── base.html       # Base template with common layout
-│   ├── index.html      # Home page
-│   └── about.html      # About page
-├── static/             # Static files (CSS, JS, images)
-│   ├── css/
-│   │   └── style.css   # Main stylesheet
-│   └── js/             # JavaScript files
-├── pyproject.toml      # Project dependencies
-└── README.md           # This file
+├── app/
+│   ├── agent/              # LangGraph agent implementation
+│   │   ├── models.py       # State schema and Pydantic models
+│   │   ├── policy.py       # Pure policy functions
+│   │   ├── supervisor.py   # Routing logic
+│   │   ├── graph.py        # LangGraph workflow
+│   │   └── workers/        # Worker nodes
+│   ├── core/               # Core functionality
+│   │   ├── config.py       # Settings
+│   │   ├── database.py     # MongoDB connection
+│   │   └── auth.py         # Authentication
+│   ├── routers/            # API routes
+│   │   ├── api.py          # JSON API endpoints
+│   │   ├── pages.py        # HTML pages
+│   │   └── auth.py         # Auth endpoints
+│   ├── services/           # Business logic
+│   │   └── agent_service.py # Agent orchestration
+│   └── models/             # Data models
+├── templates/              # Jinja2 templates
+├── static/                 # CSS, JS, images
+├── scripts/                # Utility scripts
+└── docker-compose.yml      # Docker configuration
 ```
 
 ## Installation
@@ -32,154 +68,204 @@ supervisor-workers-agent/
 ### Prerequisites
 
 - Python 3.12 or higher
+- Docker & Docker Compose
+- OpenAI API key
 - uv (recommended) or pip
 
 ### Setup
 
-1. **Clone or navigate to the project directory**
+1. **Clone the repository**
 
-2. **Install dependencies using uv (recommended):**
+2. **Copy environment file and add your OpenAI API key:**
    ```bash
-   uv sync
+   cp .env.example .env
+   # Edit .env and add your OPENAI_API_KEY
    ```
 
-   Or using pip:
+3. **Start with Docker (recommended):**
    ```bash
-   pip install -e .
+   docker compose up -d --build
    ```
 
-## Running the Application
+   This starts:
+   - **Web App**: http://localhost:8000
+   - **MongoDB**: localhost:27017
+   - **Mongo Express**: http://localhost:8081
 
-### Local Development
+4. **Load sample order data:**
+   ```bash
+   # The fixtures are loaded automatically on first run
+   # Or manually load them:
+   docker compose exec web python scripts/load_fixtures.py
+   ```
 
-#### Method 1: Using run.py
+### Local Development (without Docker)
 
 ```bash
+# Install dependencies
+uv sync
+
+# Start MongoDB locally or update MONGODB_URL in .env
+
+# Run the application
 python run.py
 ```
 
-#### Method 2: Using uvicorn directly
+## Usage
 
-```bash
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
+### Chatbot Flow Example
 
-### Docker Deployment
+1. **Visit** http://localhost:8000 and log in
+2. **Start conversation**: "I want to return my order"
+3. **Provide order number**: "ORD-20241001-001"
+4. **Confirm details**: "Yes"
+5. **Receive ticket**: The agent creates a return ticket and provides next steps
 
-#### Quick Start
-```bash
-# Build and start all services (FastAPI + MongoDB + Mongo Express)
-docker-compose up -d --build
+### Sample Order Numbers
 
-# View logs
-docker-compose logs -f
+The database includes 10 sample orders:
+- `ORD-20241001-001` through `ORD-20241001-010`
 
-# Stop services
-docker-compose down
-```
-
-#### Services
-- **Web App**: http://localhost:8000
-- **API Docs**: http://localhost:8000/docs
-- **Mongo Express**: http://localhost:8081 (admin/admin123)
-- **MongoDB**: localhost:27017
-
-For detailed Docker instructions, see [DOCKER.md](DOCKER.md).
-
-The application will be available at:
-- **Home page**: http://localhost:8000
-- **About page**: http://localhost:8000/about
-- **API docs**: http://localhost:8000/docs (Swagger UI)
-- **Alternative docs**: http://localhost:8000/redoc (ReDoc)
-
-## Available Endpoints
-
-### HTML Pages
-- `GET /` - Home page
-- `GET /about` - About page
+Try them to test different eligibility scenarios!
 
 ### API Endpoints
-- `GET /api/health` - Health check endpoint (returns JSON)
-- `GET /api/data` - Sample data endpoint (returns JSON)
+
+#### Chat Endpoint
+```bash
+POST /api/chat
+Content-Type: application/json
+
+{
+  "message": "I want to return my order",
+  "session_id": "optional-session-id"
+}
+```
+
+#### Get Conversation History
+```bash
+GET /api/session/{session_id}/history
+```
+
+## Configuration
+
+Key settings in `.env`:
+
+```bash
+# OpenAI (Required)
+OPENAI_API_KEY=your-key-here
+OPENAI_MODEL=gpt-4o-mini
+
+# MongoDB
+MONGODB_URL=mongodb://mongodb:27017
+MONGODB_DB_NAME=chatbot
+
+# JWT Authentication
+SECRET_KEY=your-secret-key
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+```
+
+## Policy Configuration
+
+Edit `app/agent/policy.py` to customize:
+
+- `DEFAULT_RETURN_WINDOW_DAYS` - Default return window (30 days)
+- `DEFAULT_REFUND_WINDOW_DAYS` - Default refund window (14 days)
+- `CATEGORY_OVERRIDES` - Category-specific windows
+
+## Testing
+
+### Test Scenarios
+
+1. **Happy Path (Return)**
+   - "I want to return my order"
+   - Provide order number within 30-day window
+   - Confirm details
+   - Receive return ticket
+
+2. **Refund Request**
+   - "Can I get a refund?"
+   - Provide order number within 14-day window
+   - Complete refund flow
+
+3. **Order Not Found**
+   - Provide invalid order number
+   - Agent asks to re-enter
+
+4. **Outside Window**
+   - Use old order (>30 days)
+   - Agent explains ineligibility
 
 ## Development
 
-### Adding New Pages
+### Adding New Workers
 
-1. **Create a new template** in `templates/`:
-   ```html
-   {% extends "base.html" %}
-   
-   {% block content %}
-   <h1>Your Page Title</h1>
-   <p>Your content here</p>
-   {% endblock %}
-   ```
+1. Create worker file in `app/agent/workers/`
+2. Implement async function: `async def your_worker(state: AgentState) -> Dict[str, Any]`
+3. Add to `app/agent/graph.py`
+4. Update supervisor routing in `app/agent/supervisor.py`
 
-2. **Add a route** in `main.py`:
-   ```python
-   @app.get("/your-page", response_class=HTMLResponse)
-   async def your_page(request: Request):
-       return templates.TemplateResponse(
-           "your_page.html",
-           {"request": request, "title": "Your Page"}
-       )
-   ```
+### Modifying Policy
 
-### Adding API Endpoints
+Edit `app/agent/policy.py` - all policy logic is pure functions (easy to test).
 
-```python
-@app.get("/api/your-endpoint")
-async def your_endpoint():
-    return {"message": "Your data here"}
+## Monitoring
+
+### View Logs
+```bash
+docker compose logs -f web
 ```
 
-### Adding Static Files
+### Access MongoDB
+- **Mongo Express UI**: http://localhost:8081 (admin/admin123)
+- **Direct connection**: `mongodb://localhost:27017`
 
-Place your static files in the appropriate directory:
-- CSS files: `static/css/`
-- JavaScript files: `static/js/`
-- Images: `static/images/`
+### Inspect Sessions
+```bash
+# View conversation sessions
+docker compose exec mongodb mongosh chatbot --eval "db.conversation_sessions.find().pretty()"
 
-Reference them in templates:
-```html
-<link rel="stylesheet" href="{{ url_for('static', path='/css/your-style.css') }}">
-<script src="{{ url_for('static', path='/js/your-script.js') }}"></script>
+# View action tickets
+docker compose exec mongodb mongosh chatbot --eval "db.action_tickets.find().pretty()"
 ```
 
-## Template System
+## Deployment
 
-This project uses Jinja2 for templating. The `base.html` template provides:
-- Common HTML structure
-- Navigation bar
-- Footer
-- CSS and JavaScript inclusion
-- Block system for content extension
+See [DOCKER.md](DOCKER.md) for production deployment guide.
 
-### Template Blocks
+## Troubleshooting
 
-- `{% block title %}` - Page title
-- `{% block extra_css %}` - Additional CSS files
-- `{% block content %}` - Main page content
-- `{% block extra_js %}` - Additional JavaScript files
+### Agent not responding
+- Check OpenAI API key is set correctly in `.env`
+- View logs: `docker compose logs web`
+- Verify MongoDB is running: `docker compose ps`
+
+### Orders not found
+- Load fixtures: `docker compose exec web python scripts/load_fixtures.py`
+- Check MongoDB: Visit http://localhost:8081
+
+### Authentication issues
+- Clear browser cookies
+- Check JWT secret key is set in `.env`
 
 ## Dependencies
 
 - **fastapi** - Web framework
-- **uvicorn[standard]** - ASGI server
-- **jinja2** - Template engine
-- **python-multipart** - Form data support
+- **langgraph** - Agent workflow orchestration
+- **langchain-openai** - OpenAI integration
+- **motor** - Async MongoDB driver
+- **pymongo** - MongoDB driver
+- **bcrypt** - Password hashing
+- **python-jose** - JWT tokens
 
 ## License
 
-This project is open source and available under the MIT License.
+MIT License
 
 ## Next Steps
 
-- Add database integration (SQLAlchemy, MongoDB, etc.)
-- Implement user authentication
-- Add form handling with validation
-- Implement HTMX for dynamic updates
-- Add more API endpoints
-- Set up testing with pytest
-- Deploy to production (Docker, cloud platforms)
+- [ ] Add more worker types (FAQ, product info)
+- [ ] Implement real email service
+- [ ] Add conversation analytics
+- [ ] Deploy to production
+- [ ] Add unit tests for workers
+- [ ] Implement human handoff

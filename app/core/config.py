@@ -27,6 +27,10 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
     
+    # OpenAI settings
+    openai_api_key: str = "your-openai-api-key-here"
+    openai_model: str = "gpt-4o-mini"
+    
     # Paths
     base_dir: Path = Path(__file__).resolve().parent.parent.parent
     templates_dir: Path = base_dir / "templates"
