@@ -5,8 +5,9 @@ A FastAPI-based customer service chatbot application with a **supervisor-workers
 ## Features
 
 - 🤖 **LangGraph Agent** - Supervisor-workers architecture for customer service
-- � **State Persistence** - MongoDB checkpointing for conversation continuity across sessions
-- �🔄 **Return/Refund Processing** - Automated handling of return and refund requests
+- 💾 **State Persistence** - MongoDB checkpointing for conversation continuity across sessions
+-  **Return/Refund Processing** - Automated handling of return and refund requests
+- 📊 **Order Status Tracking** - Real-time order status with tracking information
 - 📋 **Order Lookup** - Integration with MongoDB for order data
 - ✅ **Policy Enforcement** - Deterministic eligibility checking (30-day return, 14-day refund)
 - 🎫 **Ticket Management** - Idempotent return/refund ticket creation
@@ -25,10 +26,11 @@ The agent follows a **supervisor → workers** pattern with **singleton graph + 
 
 1. **Supervisor** - Deterministic routing between workers based on state
 2. **Workers** - Specialized nodes for specific tasks:
-   - `ClassifyIntentWorker` - Classifies user intent (return/refund/other)
+   - `ClassifyIntentWorker` - Classifies user intent (return/refund/order_status/other)
    - `SlotFillerWorker` - Extracts or asks for order number
    - `OrderLookupWorker` - Fetches order from MongoDB
-   - `ConfirmDetailsWorker` - Confirms order with user (with formatted display)
+   - `ShowOrderStatusWorker` - Displays order status with tracking info (no confirmation needed)
+   - `ConfirmDetailsWorker` - Confirms order with user (with formatted display, for returns/refunds)
    - `PolicyCheckWorker` - Checks return/refund eligibility
    - `DecideActionWorker` - Determines which action to take
    - `ProcessReturnWorker` - Creates return (RMA) ticket
@@ -127,7 +129,9 @@ python run.py
 
 ## Usage
 
-### Chatbot Flow Example
+### Chatbot Flow Examples
+
+#### Returns & Refunds Flow
 
 1. **Visit** http://localhost:8000 and log in
 2. **Choose quick action**: Click "🔄 Returns & refunds" button (or type your message)
@@ -138,6 +142,18 @@ python run.py
 7. **Receive outcome**: 
    - If eligible: Return/refund ticket created with next steps
    - If not eligible: Clear explanation of why (e.g., "Outside 30-day return window")
+
+#### Order Status Flow
+
+1. **Choose quick action**: Click "📋 Order status" button
+2. **Provide order number**: "ORD-2024-001"
+3. **View status**: Agent displays:
+   - Order number and current status (delivered/shipped/processing/pending)
+   - Order date and delivery date
+   - Tracking number (if available)
+   - Items count and total amount
+   - Status-specific message with emoji
+4. **Done**: Simple closing message (no ticket creation needed)
 
 ### Sample Order Numbers
 
@@ -151,8 +167,8 @@ The database includes 10 sample orders for testing:
 
 The chat interface includes interactive buttons for common tasks:
 - 📦 Product information (coming soon)
-- 📋 Order status (coming soon)
-- 🔄 **Returns & refunds** ← Active! Triggers return flow
+- 📋 **Order status** ← Active! Check order status and tracking
+- 🔄 **Returns & refunds** ← Active! Triggers return/refund flow
 - 🔧 Technical support (coming soon)
 - 👤 Account management (coming soon)
 
@@ -215,11 +231,17 @@ Edit `app/agent/policy.py` to customize:
    - Provide order number within 14-day window
    - Complete refund flow
 
-3. **Order Not Found**
+3. **Order Status Check**
+   - Click "📋 Order status" button or ask "What's the status of my order?"
+   - Provide order number (e.g., "ORD-2024-001")
+   - View formatted status display with tracking info
+   - No confirmation or ticket creation needed
+
+4. **Order Not Found**
    - Provide invalid order number
    - Agent asks to re-enter
 
-4. **Outside Window**
+5. **Outside Window**
    - Use old order (>30 days)
    - Agent explains ineligibility
 
@@ -352,7 +374,9 @@ MIT License
 - [x] ~~Human-in-the-loop for turn-taking~~
 - [x] ~~Quick reply buttons for common actions~~
 - [x] ~~Formatted order display with bullet points~~
-- [ ] Add more worker types (FAQ, product info, order tracking)
+- [x] ~~Order status tracking functionality~~
+- [ ] Add real tracking API integration (FedEx, UPS, USPS)
+- [ ] Add more worker types (FAQ, product info)
 - [ ] Implement real email service (SendGrid, AWS SES)
 - [ ] Add conversation analytics dashboard
 - [ ] Deploy to production (Railway, Render, AWS)

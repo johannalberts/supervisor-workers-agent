@@ -17,11 +17,19 @@ async def finalize_worker(state: AgentState) -> Dict[str, Any]:
     Returns:
         Updated state with final message
     """
+    intent = state.get("intent")
     order = state.get("order")
     action_ticket = state.get("action_ticket", {})
     desired_action = state.get("desired_action")
     email_status = state.get("email_status")
     messages = state.get("messages", [])
+    
+    # Handle order_status intent - simple closing
+    if intent == "order_status":
+        final_message = "Is there anything else I can help you with today?"
+        return {
+            "messages": messages + [AIMessage(content=final_message)]
+        }
     
     ticket_id = action_ticket.get("id", "Unknown")
     customer_email = order.get("customer_email", "your email") if order else "your email"

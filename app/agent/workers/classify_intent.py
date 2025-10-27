@@ -12,15 +12,20 @@ SYSTEM_PROMPT = """You are a customer service intent classifier.
 Your job is to determine if the user wants to:
 - "return" (return a product/order)
 - "refund" (get money back)
+- "order_status" (check order status or tracking)
 - "other" (something else)
 
-Respond with ONLY ONE WORD: return, refund, or other.
+Respond with ONLY ONE WORD: return, refund, order_status, or other.
 
 Examples:
 User: "I want to return my order" -> return
 User: "Can I get a refund?" -> refund
 User: "I'd like my money back" -> refund
 User: "Send this back" -> return
+User: "Where is my order?" -> order_status
+User: "What's the status of my order?" -> order_status
+User: "Track my package" -> order_status
+User: "Has my order shipped?" -> order_status
 User: "What's your phone number?" -> other
 """
 
@@ -69,7 +74,7 @@ async def classify_intent_worker(state: AgentState, llm: ChatOpenAI) -> Dict[str
         intent = response.content.strip().lower()
         
         # Validate intent
-        if intent not in ["return", "refund", "other"]:
+        if intent not in ["return", "refund", "order_status", "other"]:
             intent = "other"
         
         print(f"[CLASSIFY_INTENT] Classified as: {intent}")

@@ -18,6 +18,7 @@ from app.agent.workers.decide_action import decide_action_worker
 from app.agent.workers.process_return import process_return_worker
 from app.agent.workers.process_refund import process_refund_worker
 from app.agent.workers.email import email_worker
+from app.agent.workers.show_order_status import show_order_status_worker
 from app.agent.workers.finalize import finalize_worker
 
 
@@ -90,6 +91,12 @@ def create_agent_graph(llm: ChatOpenAI, db: AsyncIOMotorDatabase, checkpointer: 
         print(f"[GRAPH] email result: status={result.get('email_status')}")
         return result
     
+    async def show_order_status_node(state: AgentState):
+        print(f"[GRAPH] Executing show_order_status_node")
+        result = await show_order_status_worker(state)
+        print(f"[GRAPH] show_order_status complete")
+        return result
+    
     async def finalize_node(state: AgentState):
         print(f"[GRAPH] Executing finalize_node")
         result = await finalize_worker(state)
@@ -109,6 +116,7 @@ def create_agent_graph(llm: ChatOpenAI, db: AsyncIOMotorDatabase, checkpointer: 
     workflow.add_node("process_return", process_return_node)
     workflow.add_node("process_refund", process_refund_node)
     workflow.add_node("email", email_node)
+    workflow.add_node("show_order_status", show_order_status_node)
     workflow.add_node("finalize", finalize_node)
     
     # Set the entry point
@@ -128,6 +136,7 @@ def create_agent_graph(llm: ChatOpenAI, db: AsyncIOMotorDatabase, checkpointer: 
             "process_return": "process_return",
             "process_refund": "process_refund",
             "email": "email",
+            "show_order_status": "show_order_status",
             "finalize": "finalize",
             "__end__": END
         }
@@ -146,6 +155,7 @@ def create_agent_graph(llm: ChatOpenAI, db: AsyncIOMotorDatabase, checkpointer: 
             "process_return": "process_return",
             "process_refund": "process_refund",
             "email": "email",
+            "show_order_status": "show_order_status",
             "finalize": "finalize",
             "__end__": END
         }
@@ -164,6 +174,7 @@ def create_agent_graph(llm: ChatOpenAI, db: AsyncIOMotorDatabase, checkpointer: 
             "process_return": "process_return",
             "process_refund": "process_refund",
             "email": "email",
+            "show_order_status": "show_order_status",
             "finalize": "finalize",
             "__end__": END
         }
@@ -182,6 +193,7 @@ def create_agent_graph(llm: ChatOpenAI, db: AsyncIOMotorDatabase, checkpointer: 
             "process_return": "process_return",
             "process_refund": "process_refund",
             "email": "email",
+            "show_order_status": "show_order_status",
             "finalize": "finalize",
             "__end__": END
         }
@@ -200,6 +212,7 @@ def create_agent_graph(llm: ChatOpenAI, db: AsyncIOMotorDatabase, checkpointer: 
             "process_return": "process_return",
             "process_refund": "process_refund",
             "email": "email",
+            "show_order_status": "show_order_status",
             "finalize": "finalize",
             "__end__": END
         }
@@ -218,6 +231,7 @@ def create_agent_graph(llm: ChatOpenAI, db: AsyncIOMotorDatabase, checkpointer: 
             "process_return": "process_return",
             "process_refund": "process_refund",
             "email": "email",
+            "show_order_status": "show_order_status",
             "finalize": "finalize",
             "__end__": END
         }
@@ -236,6 +250,7 @@ def create_agent_graph(llm: ChatOpenAI, db: AsyncIOMotorDatabase, checkpointer: 
             "process_return": "process_return",
             "process_refund": "process_refund",
             "email": "email",
+            "show_order_status": "show_order_status",
             "finalize": "finalize",
             "__end__": END
         }
@@ -254,6 +269,7 @@ def create_agent_graph(llm: ChatOpenAI, db: AsyncIOMotorDatabase, checkpointer: 
             "process_return": "process_return",
             "process_refund": "process_refund",
             "email": "email",
+            "show_order_status": "show_order_status",
             "finalize": "finalize",
             "__end__": END
         }
@@ -272,6 +288,26 @@ def create_agent_graph(llm: ChatOpenAI, db: AsyncIOMotorDatabase, checkpointer: 
             "process_return": "process_return",
             "process_refund": "process_refund",
             "email": "email",
+            "show_order_status": "show_order_status",
+            "finalize": "finalize",
+            "__end__": END
+        }
+    )
+    
+    workflow.add_conditional_edges(
+        "show_order_status",
+        supervisor_router,
+        {
+            "classify_intent": "classify_intent",
+            "slot_filler": "slot_filler",
+            "order_lookup": "order_lookup",
+            "confirm_details": "confirm_details",
+            "policy_check": "policy_check",
+            "decide_action": "decide_action",
+            "process_return": "process_return",
+            "process_refund": "process_refund",
+            "email": "email",
+            "show_order_status": "show_order_status",
             "finalize": "finalize",
             "__end__": END
         }

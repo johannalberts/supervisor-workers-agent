@@ -10,7 +10,7 @@ from app.agent.models import AgentState
 def supervisor_router(state: AgentState) -> Literal[
     "classify_intent", "slot_filler", "order_lookup", "confirm_details",
     "policy_check", "decide_action", "process_return", "process_refund",
-    "send_email", "finalize", "__end__"
+    "send_email", "show_order_status", "finalize", "__end__"
 ]:
     """
     Routes to the appropriate worker based on state
@@ -52,9 +52,9 @@ def supervisor_router(state: AgentState) -> Literal[
         print("→ Routing to: classify_intent (no intent)")
         return "classify_intent"
     
-    # 2. Get order number if intent is return/refund
+    # 2. Get order number if intent needs it (return/refund/order_status)
     intent = state.get("intent")
-    if intent in ["return", "refund"] and not state.get("order_number"):
+    if intent in ["return", "refund", "order_status"] and not state.get("order_number"):
         print("→ Routing to: slot_filler (need order number)")
         return "slot_filler"
     
@@ -63,50 +63,55 @@ def supervisor_router(state: AgentState) -> Literal[
         print("→ Routing to: order_lookup (have order number, need order)")
         return "order_lookup"
     
-    # 4. Confirm order details with user if not confirmed
-    if state.get("order") and state.get("user_confirmed_order") is None:
+    # 4. For order_status intent: go directly to show_order_status after lookup
+    if intent == "order_status" and state.get("order"):
+        print("→ Routing to: show_order_status (order status check)")
+        return "show_order_status"
+    
+    # 5. Confirm order details with user if not confirmed (for return/refund only)
+    if state.get("order") and state.get("user_confirmed_order") is None and intent in ["return", "refund"]:
         print("→ Routing to: confirm_details (need confirmation)")
         return "confirm_details"
     
-    # 5. If user declined, end conversation
+    # 6. If user declined, end conversation
     if state.get("user_confirmed_order") is False:
         print("→ Routing to: finalize (user declined)")
         return "finalize"
     
-    # 6. Check policy eligibility if confirmed but not checked
+    # 7. Check policy eligibility if confirmed but not checked
     if state.get("user_confirmed_order") and not state.get("eligibility"):
         print("→ Routing to: policy_check (need eligibility check)")
         return "policy_check"
     
-    # 7. Decide action if eligible but no decision made
+    # 8. Decide action if eligible but no decision made
     eligibility = state.get("eligibility", {})
     if eligibility.get("eligible") and not state.get("desired_action"):
         print("→ Routing to: decide_action (eligible, need action)")
         return "decide_action"
     
-    # 8. If not eligible, finalize
+    # 9. If not eligible, finalize
     if eligibility and not eligibility.get("eligible"):
         print("→ Routing to: finalize (not eligible)")
         return "finalize"
     
-    # 9. Process return if that's the desired action
+    # 10. Process return if that's the desired action
     desired_action = state.get("desired_action")
     action_ticket = state.get("action_ticket", {})
     if desired_action == "return" and not action_ticket.get("id"):
         print("→ Routing to: process_return (processing return)")
         return "process_return"
     
-    # 10. Process refund if that's the desired action
+    # 11. Process refund if that's the desired action
     if desired_action == "refund" and not action_ticket.get("id"):
         print("→ Routing to: process_refund (processing refund)")
         return "process_refund"
     
-    # 11. Send email if we have a ticket but haven't sent email
+    # 12. Send email if we have a ticket but haven't sent email
     if action_ticket.get("id") and not state.get("email_status"):
         print("→ Routing to: send_email (have ticket, need email)")
         return "send_email"
     
-    # 12. Finalize if email sent
+    # 13. Finalize if email sent
     if state.get("email_status"):
         print("→ Routing to: finalize (email sent, finalizing)")
         return "finalize"
