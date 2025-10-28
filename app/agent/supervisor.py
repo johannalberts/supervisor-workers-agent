@@ -64,7 +64,15 @@ def supervisor_router(state: AgentState) -> Literal[
         return "order_lookup"
     
     # 4. For order_status intent: go directly to show_order_status after lookup
+    # But only if we haven't shown it yet (check if last message is from assistant with status info)
     if intent == "order_status" and state.get("order"):
+        # Check if we already showed the status
+        if messages and isinstance(messages[-1], AIMessage):
+            last_msg = messages[-1].content.lower()
+            # If last message contains status info, we already showed it - go to finalize
+            if "status:" in last_msg or "order #" in last_msg or "delivery" in last_msg:
+                print("→ Routing to: finalize (order status shown)")
+                return "finalize"
         print("→ Routing to: show_order_status (order status check)")
         return "show_order_status"
     
