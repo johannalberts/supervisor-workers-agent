@@ -1,20 +1,57 @@
 """
 FinalizeWorker
-Finalizes the conversation with a summary
+Finalizes the conversation with templates (Zendesk-style)
 """
 from typing import Dict, Any
-from langchain_openai import ChatOpenAI
-from langchain_core.messages import AIMessage, SystemMessage, HumanMessage
+import random
+from langchain_core.messages import AIMessage
 from app.agent.models import AgentState
 
 
-async def finalize_worker(state: AgentState, llm: ChatOpenAI = None) -> Dict[str, Any]:
+# Template variations for different scenarios (Zendesk pattern)
+ORDER_STATUS_CLOSING = [
+    "Is there anything else I can help you with today?",
+    "Do you need help with anything else?",
+    "Can I assist you with anything else today?",
+]
+
+CANCEL_TEMPLATES = [
+    "Thank you for contacting us. If you have any other questions, feel free to reach out!",
+    "No problem! If you need anything else, we're here to help.",
+    "Sounds good! Don't hesitate to reach out if you need assistance in the future.",
+]
+
+DENIAL_TEMPLATES = [
+    "I'm sorry, but this order isn't eligible for {intent}. {reason}\n\nIf you have questions about our policy or need help with something else, I'm here to assist!",
+    "Unfortunately, this order doesn't qualify for {intent}. {reason}\n\nLet me know if there's anything else I can help you with!",
+    "I apologize, but we can't process a {intent} for this order. {reason}\n\nIs there something else I can do for you today?",
+]
+
+SUCCESS_RETURN_TEMPLATE = """✅ Perfect! I've created return ticket **{ticket_id}** for your order.{email_note}
+
+**Next steps:**
+1. Package your items securely
+2. Print the return label from the email
+3. Drop off at any authorized location
+
+We'll process your return within 3-5 business days after we receive it. Thanks for your patience!"""
+
+SUCCESS_REFUND_TEMPLATE = """✅ All done! I've created refund ticket **{ticket_id}** for your order.{email_note}
+
+**Next steps:**
+1. We'll process your refund within 3-5 business days
+2. You'll receive the funds in your original payment method
+3. You'll get an email confirmation once it's processed
+
+Thank you for your patience!"""
+
+
+async def finalize_worker(state: AgentState) -> Dict[str, Any]:
     """
-    Finalize the conversation with a natural language summary
+    Finalize the conversation using templates
     
     Args:
         state: Current agent state
-        llm: Language model instance for generating responses
         
     Returns:
         Updated state with final message
@@ -28,25 +65,14 @@ async def finalize_worker(state: AgentState, llm: ChatOpenAI = None) -> Dict[str
     
     # Handle order_status intent - simple closing
     if intent == "order_status":
-        if llm:
-            closing_prompt = """Generate a brief, friendly closing message (1 sentence) that:
-- Offers further assistance
-- Sounds natural and warm
-Keep it conversational."""
-            
-            response = await llm.ainvoke([
-                SystemMessage(content=closing_prompt),
-                HumanMessage(content="Order status inquiry completed")
-            ])
-            final_message = response.content
-        else:
-            final_message = "Is there anything else I can help you with today?"
-        
+        final_message = random.choice(ORDER_STATUS_CLOSING)
         return {
-            "messages": messages + [AIMessage(content=final_message)]
+            "messages": messages + [AIMessage(content=final_message)],
+            "conversation_complete": True  # Flag to allow new intent classification
         }
     
-    ticket_id = action_ticket.get("id", "Unknown")
+    # Safely get ticket_id and email
+    ticket_id = (action_ticket or {}).get("id", "Unknown")
     customer_email = order.get("customer_email", "your email") if order else "your email"
     
     # Mask email
@@ -59,30 +85,9 @@ Keep it conversational."""
     else:
         masked_email = "***"
     
-    # Prepare context for LLM
-    context = {
-        "intent": intent,
-        "desired_action": desired_action,
-        "ticket_id": ticket_id,
-        "email": masked_email,
-        "email_status": email_status
-    }
-    
     # Handle explicit cancel
     if desired_action == "cancel":
-        if llm:
-            cancel_prompt = """Generate a brief, friendly closing message (1-2 sentences) that:
-- Thanks them for contacting us
-- Invites them to reach out again if needed
-Keep it warm and professional."""
-            
-            response = await llm.ainvoke([
-                SystemMessage(content=cancel_prompt),
-                HumanMessage(content="User cancelled the request")
-            ])
-            final_message = response.content
-        else:
-            final_message = "Thank you for contacting us. If you have any other questions, feel free to reach out!"
+        final_message = random.choice(CANCEL_TEMPLATES)
     
     # Handle case where no desired action was set (e.g., not eligible)
     elif not desired_action:
@@ -90,86 +95,38 @@ Keep it warm and professional."""
         # If eligibility was computed and neither return nor refund is available
         if eligibility and not eligibility.get("is_return_eligible") and not eligibility.get("is_refund_eligible"):
             reason = eligibility.get("reason", "Not eligible under our policy.")
-            
-            if llm:
-                denial_prompt = f"""Generate an empathetic denial message (2-3 sentences) that:
-- Apologizes sincerely
-- Explains why: {reason}
-- Offers to help with other questions if they have any
-Be understanding and professional."""
-                
-                response = await llm.ainvoke([
-                    SystemMessage(content=denial_prompt),
-                    HumanMessage(content=f"Order not eligible for return/refund: {reason}")
-                ])
-                final_message = response.content
-            else:
-                final_message = f"I'm sorry — this order isn't eligible for return or refund. Reason: {reason}"
+            intent_name = "return or refund"
+            final_message = random.choice(DENIAL_TEMPLATES).format(
+                intent=intent_name,
+                reason=reason
+            )
         else:
             # Generic fallback
-            if llm:
-                fallback_prompt = """Generate a brief closing message (1 sentence) that:
-- Thanks them
-- Offers further assistance
-Keep it professional."""
-                
-                response = await llm.ainvoke([
-                    SystemMessage(content=fallback_prompt),
-                    HumanMessage(content="Completed check")
-                ])
-                final_message = response.content
-            else:
-                final_message = "Thank you. We've completed the check. If you need further help, please let us know."
+            final_message = random.choice(ORDER_STATUS_CLOSING)
     
     else:
-        # We have a desired action and should summarize the created ticket
-        if llm:
-            success_prompt = f"""Generate a comprehensive success message (3-4 sentences + bullet points) that:
-- Celebrates the completion (✅)
-- States the {desired_action} ticket {ticket_id} has been created
-- Mentions email sent to {masked_email} (if email_status is 'sent')
-- Provides clear next steps in bullet points:
-  * For return: Package securely, print label, drop off
-  * For refund: Processing time (3-5 days), original payment method
-- Ends on a positive, helpful note
-
-Keep it friendly, clear, and professional. Use formatting like ** for emphasis."""
-            
-            email_context = f"Email status: {email_status}" if email_status else "No email sent yet"
-            
-            response = await llm.ainvoke([
-                SystemMessage(content=success_prompt),
-                HumanMessage(content=f"Created {desired_action} ticket {ticket_id}. {email_context}")
-            ])
-            final_message = response.content
-        else:
-            # Fallback to template
-            email_note = ""
-            if email_status == "sent":
-                email_note = f" I've emailed {masked_email} with the details and next steps."
-            elif email_status == "failed":
-                email_note = " Note: There was an issue sending the confirmation email, but your ticket has been created."
-
-            final_message = (
-                f"✅ All done! I've created a {desired_action} ticket {ticket_id} for your order.{email_note}\n\n"
-                f"**Next steps:**\n"
+        # We have a desired action - use success templates
+        email_note = ""
+        if email_status == "sent":
+            email_note = f" I've sent all the details to {masked_email}."
+        elif email_status == "failed":
+            email_note = " Note: There was an issue sending the email, but your ticket has been created."
+        
+        if desired_action == "return":
+            final_message = SUCCESS_RETURN_TEMPLATE.format(
+                ticket_id=ticket_id,
+                email_note=email_note
             )
-
-            if desired_action == "return":
-                final_message += (
-                    "1. Package your items securely\n"
-                    "2. Print the return label from the email\n"
-                    "3. Drop off at any authorized location\n\n"
-                    "We'll process your return within 3-5 business days after we receive it."
-                )
-            elif desired_action == "refund":
-                final_message += (
-                    "1. We'll process your refund within 3-5 business days\n"
-                    "2. You'll receive the funds in your original payment method\n"
-                    "3. You'll get an email confirmation once it's processed\n\n"
-                    "Thank you for your patience!"
-                )
+        elif desired_action == "refund":
+            final_message = SUCCESS_REFUND_TEMPLATE.format(
+                ticket_id=ticket_id,
+                email_note=email_note
+            )
+        else:
+            # Fallback
+            final_message = f"✅ Done! I've created ticket {ticket_id} for your {desired_action} request.{email_note}"
     
     return {
-        "messages": messages + [AIMessage(content=final_message)]
+        "messages": messages + [AIMessage(content=final_message)],
+        "conversation_complete": True  # Flag to allow new intent classification
     }

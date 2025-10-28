@@ -1,23 +1,48 @@
 """
 ShowOrderStatusWorker
-Displays order status information to the user
+Displays order status information using templates (Zendesk-style)
 """
 from typing import Dict, Any
 from datetime import datetime
-from langchain_openai import ChatOpenAI
-from langchain_core.messages import AIMessage, SystemMessage, HumanMessage
+import random
+from langchain_core.messages import AIMessage
 from app.agent.models import AgentState
 
 
-def format_order_status(order: Dict[str, Any]) -> Dict[str, str]:
+# Status-specific message templates (Zendesk pattern)
+STATUS_MESSAGES = {
+    "delivered": [
+        "✅ Great news! Your order has been delivered. If you have any issues with your items, please let me know!",
+        "✅ Your order was successfully delivered! Everything should be there. Let me know if you need anything else.",
+        "✅ Delivery confirmed! Your order has arrived. If something's not right, I'm here to help!",
+    ],
+    "shipped": [
+        "📦 Excellent! Your order is on its way and should arrive soon.",
+        "📦 Your order has shipped and is currently in transit. Delivery is coming up!",
+        "📦 Good news — your order is out for delivery and will be with you shortly!",
+    ],
+    "processing": [
+        "⏳ Your order is currently being prepared for shipment. We'll have it on its way soon!",
+        "⏳ We're processing your order right now. It should ship within the next day or two.",
+        "⏳ Your order is being packed and will ship out very soon!",
+    ],
+    "pending": [
+        "📋 Your order has been received and will be processed shortly.",
+        "📋 Thanks for your order! We've got it and will start processing soon.",
+        "📋 Order confirmed! We'll begin processing it right away.",
+    ],
+}
+
+
+def format_order_status(order: Dict[str, Any]) -> str:
     """
-    Format order status details for display
+    Format order status details using templates
     
     Args:
         order: Order data
         
     Returns:
-        Dictionary with formatted fields for LLM to use
+        Formatted status message string
     """
     order_id = order.get("order_id", "Unknown")
     order_date = order.get("order_date")
@@ -43,29 +68,34 @@ def format_order_status(order: Dict[str, Any]) -> Dict[str, str]:
     # Count items
     total_items = sum(item.get("quantity", 1) for item in items)
     
-    # Return structured data for LLM
-    return {
-        "order_id": order_id,
-        "status": status,
-        "order_date": order_date_str,
-        "delivery_date": delivery_date_str,
-        "total": f"${total:.2f}",
-        "items_count": total_items,
-        "tracking": tracking,
-        "is_delivered": status.lower() == "delivered",
-        "is_shipped": status.lower() == "shipped",
-        "is_processing": status.lower() == "processing",
-        "is_pending": status.lower() == "pending"
-    }
+    # Build status message using template
+    status_message = f"""Here's the status of your order:
+
+**Order #{order_id}**
+• Status: {status}
+• Order Date: {order_date_str}
+• Delivery: {delivery_date_str}
+• Total: ${total:.2f}
+• Items: {total_items} item(s)"""
+    
+    if tracking != "Not available":
+        status_message += f"\n• Tracking: {tracking}"
+    
+    # Add status-specific message from template variations
+    status_key = status.lower()
+    if status_key in STATUS_MESSAGES:
+        status_note = random.choice(STATUS_MESSAGES[status_key])
+        status_message += f"\n\n{status_note}"
+    
+    return status_message
 
 
-async def show_order_status_worker(state: AgentState, llm: ChatOpenAI = None) -> Dict[str, Any]:
+async def show_order_status_worker(state: AgentState) -> Dict[str, Any]:
     """
-    Display order status information with natural language
+    Display order status information using templates
     
     Args:
         state: Current agent state
-        llm: Language model instance for generating responses
         
     Returns:
         Updated state with status message
@@ -80,50 +110,7 @@ async def show_order_status_worker(state: AgentState, llm: ChatOpenAI = None) ->
         }
     
     messages = state.get("messages", [])
-    status_data = format_order_status(order)
-    
-    if llm:
-        # Generate natural language status message
-        status_prompt = f"""Generate a friendly, informative message about the customer's order status.
-
-Order details:
-- Order #: {status_data['order_id']}
-- Status: {status_data['status']}
-- Order Date: {status_data['order_date']}
-- Delivery Date: {status_data['delivery_date']}
-- Total: {status_data['total']}
-- Items: {status_data['items_count']} item(s)
-- Tracking: {status_data['tracking']}
-
-Guidelines:
-- Be conversational and friendly
-- Present the information clearly with bullet points
-- Add a status-specific message at the end:
-  * If delivered: Express happiness and offer help if needed
-  * If shipped: Build excitement about upcoming delivery
-  * If processing: Reassure them it's being prepared
-  * If pending: Confirm order received and processing will start soon
-- Use appropriate emojis (✅ 📦 ⏳ 📋) to match the status
-- Keep it concise (3-5 sentences plus bullet points)"""
-        
-        response = await llm.ainvoke([
-            SystemMessage(content=status_prompt),
-            HumanMessage(content=f"Show status for order {status_data['order_id']}")
-        ])
-        status_message = response.content
-    else:
-        # Fallback to template
-        status_message = f"""Here's the status of your order:
-
-Order #{status_data['order_id']}
-• Status: {status_data['status']}
-• Order Date: {status_data['order_date']}
-• Delivery: {status_data['delivery_date']}
-• Total: {status_data['total']}
-• Items: {status_data['items_count']} item(s)"""
-        
-        if status_data['tracking'] != "Not available":
-            status_message += f"\n• Tracking: {status_data['tracking']}"
+    status_message = format_order_status(order)
     
     return {
         "messages": messages + [AIMessage(content=status_message)]

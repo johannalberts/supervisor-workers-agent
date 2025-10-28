@@ -57,7 +57,7 @@ def create_agent_graph(llm: ChatOpenAI, db: AsyncIOMotorDatabase, checkpointer: 
     
     async def confirm_details_node(state: AgentState):
         print(f"[GRAPH] Executing confirm_details_node")
-        result = await confirm_details_worker(state, llm)
+        result = await confirm_details_worker(state)
         print(f"[GRAPH] confirm_details result: confirmed={result.get('user_confirmed_order')}")
         return result
     
@@ -93,13 +93,15 @@ def create_agent_graph(llm: ChatOpenAI, db: AsyncIOMotorDatabase, checkpointer: 
     
     async def show_order_status_node(state: AgentState):
         print(f"[GRAPH] Executing show_order_status_node")
-        result = await show_order_status_worker(state, llm)
+        result = await show_order_status_worker(state)
         print(f"[GRAPH] show_order_status complete")
         return result
     
     async def finalize_node(state: AgentState):
         print(f"[GRAPH] Executing finalize_node")
-        result = await finalize_worker(state, llm)
+        result = await finalize_worker(state)
+        print(f"[GRAPH] finalize result keys: {result.keys()}")
+        print(f"[GRAPH] conversation_complete in result: {result.get('conversation_complete')}")
         print(f"[GRAPH] finalize complete - should END now")
         return result
     

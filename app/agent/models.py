@@ -61,6 +61,9 @@ class AgentState(TypedDict):
     # Communication
     email_status: Optional[Literal["sent", "failed"]]
     
+    # Conversation flow control
+    conversation_complete: Optional[bool]  # Flag to allow new intent after conversation ends
+    
     # Error handling
     error: Optional[dict]  # {code: str, message: str}
     

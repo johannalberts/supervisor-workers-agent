@@ -1,12 +1,32 @@
 """
 ConfirmDetailsWorker
-Confirms order details with the user
+Confirms order details with the user using templates (Zendesk-style)
 """
 from typing import Dict, Any
 from datetime import datetime
-from langchain_openai import ChatOpenAI
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+import random
+from langchain_core.messages import HumanMessage, AIMessage
 from app.agent.models import AgentState
+
+
+# Template variations for natural variety (Zendesk pattern)
+CONFIRMATION_TEMPLATES = [
+    "Perfect! Let me check what options are available for your order.",
+    "Great! I'll look into your options right away.",
+    "Excellent! Let me see what we can do for you.",
+]
+
+APOLOGY_TEMPLATES = [
+    "I apologize for the confusion. Let's start over. What's your correct order number?",
+    "I'm sorry about that mix-up. Could you please provide the correct order number?",
+    "My apologies! Let me help you find the right order. What's the order number?",
+]
+
+CONFIRMATION_REQUEST_TEMPLATES = [
+    "I found your order:\n\n{order_summary}\n\nIs this the correct order?",
+    "Here's what I found:\n\n{order_summary}\n\nDoes this look right?",
+    "Perfect! I located your order:\n\n{order_summary}\n\nCan you confirm this is correct?",
+]
 
 
 def format_order_summary(order: Dict[str, Any]) -> str:
@@ -69,7 +89,7 @@ Items:
 {items_str}"""
 
 
-async def confirm_details_worker(state: AgentState, llm: ChatOpenAI = None) -> Dict[str, Any]:
+async def confirm_details_worker(state: AgentState) -> Dict[str, Any]:
     """
     Ask user to confirm order details
     
@@ -111,40 +131,16 @@ async def confirm_details_worker(state: AgentState, llm: ChatOpenAI = None) -> D
     
     # If we just looked up the order, ask for confirmation
     if last_user_message and ("yes" in last_user_message or "correct" in last_user_message or "yep" in last_user_message or "yeah" in last_user_message):
-        # Generate natural confirmation response
-        if llm:
-            confirmation_prompt = """Generate a brief, friendly confirmation message (1-2 sentences) that:
-- Acknowledges the user's confirmation
-- Transitions to checking their options
-Keep it natural and conversational."""
-            
-            response = await llm.ainvoke([
-                SystemMessage(content=confirmation_prompt),
-                HumanMessage(content="User confirmed their order details")
-            ])
-            confirmation_msg = response.content
-        else:
-            confirmation_msg = "Perfect! Let me check what options are available for your order..."
+        # Use template with random variation (Zendesk pattern)
+        confirmation_msg = random.choice(CONFIRMATION_TEMPLATES)
         
         return {
             "user_confirmed_order": True,
             "messages": messages + [AIMessage(content=confirmation_msg)]
         }
     elif last_user_message and ("no" in last_user_message or "wrong" in last_user_message or "incorrect" in last_user_message):
-        # Generate natural apology response
-        if llm:
-            apology_prompt = """Generate a brief, empathetic apology message (1-2 sentences) that:
-- Apologizes for the confusion
-- Asks them to provide the correct order number
-Keep it natural and helpful."""
-            
-            response = await llm.ainvoke([
-                SystemMessage(content=apology_prompt),
-                HumanMessage(content="User said this is not their order")
-            ])
-            apology_msg = response.content
-        else:
-            apology_msg = "I apologize for the confusion. Let's start over. What's your correct order number?"
+        # Use template with random variation (Zendesk pattern)
+        apology_msg = random.choice(APOLOGY_TEMPLATES)
         
         return {
             "user_confirmed_order": False,
@@ -153,27 +149,11 @@ Keep it natural and helpful."""
             "messages": messages + [AIMessage(content=apology_msg)]
         }
     
-    # First time - ask for confirmation with natural language
+    # First time - ask for confirmation using template
     order_summary = format_order_summary(order)
-    
-    if llm:
-        confirmation_request_prompt = f"""Generate a friendly, conversational message (2-3 sentences) that:
-- Shows you found their order
-- Presents the order details (below)
-- Asks them to confirm if this is correct
-
-Order details:
-{order_summary}
-
-Keep the tone helpful and professional. End with a clear question asking for confirmation."""
-        
-        response = await llm.ainvoke([
-            SystemMessage(content=confirmation_request_prompt),
-            HumanMessage(content="Present order details and ask for confirmation")
-        ])
-        confirmation_request = response.content
-    else:
-        confirmation_request = f"{order_summary}\n\nIs this the correct order? Please reply 'yes' to confirm or 'no' if this isn't your order."
+    confirmation_request = random.choice(CONFIRMATION_REQUEST_TEMPLATES).format(
+        order_summary=order_summary
+    )
     
     return {
         "messages": messages + [AIMessage(content=confirmation_request)]

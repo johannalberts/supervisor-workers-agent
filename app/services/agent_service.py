@@ -219,7 +219,7 @@ class AgentService:
                     "order_number": result.get("order_number"),
                     "has_order": result.get("order") is not None,
                     "desired_action": result.get("desired_action"),
-                    "ticket_id": result.get("action_ticket", {}).get("id")
+                    "ticket_id": (result.get("action_ticket") or {}).get("id")
                 }
             }
         

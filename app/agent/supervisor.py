@@ -31,6 +31,7 @@ def supervisor_router(state: AgentState) -> Literal[
     print(f"Action Ticket: {state.get('action_ticket')}")
     print(f"Email Status: {state.get('email_status')}")
     print(f"Error: {state.get('error')}")
+    print(f"Conversation Complete: {state.get('conversation_complete')}")
     print(f"Messages count: {len(state.get('messages', []))}")
     
     # Check if there's an error - stop and wait for user to fix it
@@ -38,8 +39,30 @@ def supervisor_router(state: AgentState) -> Literal[
         print("→ Routing to: END (error occurred, waiting for user)")
         return "__end__"
     
-    # Check if last message is from assistant (we just asked user something)
+    # If conversation is complete, don't route anywhere - wait for new intent classification
+    if state.get("conversation_complete"):
+        print("→ Routing to: END (conversation complete, waiting for new request)")
+        return "__end__"
+    
+    # Get references we'll need
     messages = state.get("messages", [])
+    intent = state.get("intent")
+    
+    # Special check for order_status: if we just showed status, go to finalize next
+    # This must come BEFORE the generic "?" check because status messages might contain "?"
+    if intent == "order_status" and state.get("order"):
+        if messages and isinstance(messages[-1], AIMessage):
+            last_msg = messages[-1].content
+            print(f"[DEBUG] Last message content: {last_msg[:200]}...")
+            # Check for markers from show_order_status template
+            if "Order #" in last_msg or "• Status:" in last_msg or "• Delivery:" in last_msg:
+                print("→ Routing to: finalize (order status shown)")
+                return "finalize"
+            # Otherwise, need to show status
+            print("→ Routing to: show_order_status (order status check)")
+            return "show_order_status"
+    
+    # Check if last message is from assistant (we just asked user something)
     if messages and isinstance(messages[-1], AIMessage):
         last_content = messages[-1].content
         # If we just asked a question, stop here and wait for user response
@@ -63,63 +86,50 @@ def supervisor_router(state: AgentState) -> Literal[
         print("→ Routing to: order_lookup (have order number, need order)")
         return "order_lookup"
     
-    # 4. For order_status intent: go directly to show_order_status after lookup
-    # But only if we haven't shown it yet (check if last message is from assistant with status info)
-    if intent == "order_status" and state.get("order"):
-        # Check if we already showed the status
-        if messages and isinstance(messages[-1], AIMessage):
-            last_msg = messages[-1].content.lower()
-            # If last message contains status info, we already showed it - go to finalize
-            if "status:" in last_msg or "order #" in last_msg or "delivery" in last_msg:
-                print("→ Routing to: finalize (order status shown)")
-                return "finalize"
-        print("→ Routing to: show_order_status (order status check)")
-        return "show_order_status"
-    
-    # 5. Confirm order details with user if not confirmed (for return/refund only)
+    # 4. Confirm order details with user if not confirmed (for return/refund only)
     if state.get("order") and state.get("user_confirmed_order") is None and intent in ["return", "refund"]:
         print("→ Routing to: confirm_details (need confirmation)")
         return "confirm_details"
     
-    # 6. If user declined, end conversation
+    # 5. If user declined, end conversation
     if state.get("user_confirmed_order") is False:
         print("→ Routing to: finalize (user declined)")
         return "finalize"
     
-    # 7. Check policy eligibility if confirmed but not checked
+    # 6. Check policy eligibility if confirmed but not checked
     if state.get("user_confirmed_order") and not state.get("eligibility"):
         print("→ Routing to: policy_check (need eligibility check)")
         return "policy_check"
     
-    # 8. Decide action if eligible but no decision made
+    # 7. Decide action if eligible but no decision made
     eligibility = state.get("eligibility", {})
     if eligibility.get("eligible") and not state.get("desired_action"):
         print("→ Routing to: decide_action (eligible, need action)")
         return "decide_action"
     
-    # 9. If not eligible, finalize
+    # 8. If not eligible, finalize
     if eligibility and not eligibility.get("eligible"):
         print("→ Routing to: finalize (not eligible)")
         return "finalize"
     
-    # 10. Process return if that's the desired action
+    # 9. Process return if that's the desired action
     desired_action = state.get("desired_action")
     action_ticket = state.get("action_ticket", {})
     if desired_action == "return" and not action_ticket.get("id"):
         print("→ Routing to: process_return (processing return)")
         return "process_return"
     
-    # 11. Process refund if that's the desired action
+    # 10. Process refund if that's the desired action
     if desired_action == "refund" and not action_ticket.get("id"):
         print("→ Routing to: process_refund (processing refund)")
         return "process_refund"
     
-    # 12. Send email if we have a ticket but haven't sent email
+    # 11. Send email if we have a ticket but haven't sent email
     if action_ticket.get("id") and not state.get("email_status"):
         print("→ Routing to: send_email (have ticket, need email)")
         return "send_email"
     
-    # 13. Finalize if email sent
+    # 12. Finalize if email sent
     if state.get("email_status"):
         print("→ Routing to: finalize (email sent, finalizing)")
         return "finalize"

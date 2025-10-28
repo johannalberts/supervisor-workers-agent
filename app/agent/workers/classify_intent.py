@@ -43,11 +43,33 @@ async def classify_intent_worker(state: AgentState, llm: ChatOpenAI) -> Dict[str
         Updated state with intent classification
     """
     # If we already have an intent (from checkpoint), don't re-classify
-    # This prevents overwriting the intent when resuming from checkpoint
+    # UNLESS the conversation is complete (finalize ran) - then allow new intent
     existing_intent = state.get("intent")
-    if existing_intent:
+    conversation_complete = state.get("conversation_complete", False)
+    
+    print(f"[CLASSIFY_INTENT] DEBUG - existing_intent: {existing_intent}")
+    print(f"[CLASSIFY_INTENT] DEBUG - conversation_complete: {conversation_complete}")
+    
+    if existing_intent and not conversation_complete:
         print(f"[CLASSIFY_INTENT] Intent already set to '{existing_intent}', skipping classification")
         return {}  # Return empty dict - no changes needed
+    
+    # If conversation was complete, clear old state for fresh classification
+    if conversation_complete:
+        print(f"[CLASSIFY_INTENT] Previous conversation complete, classifying new intent")
+        # Reset state fields for new conversation
+        state_reset = {
+            "intent": None,
+            "order_number": None,
+            "order": None,
+            "user_confirmed_order": None,
+            "eligibility": None,
+            "desired_action": None,
+            "action_ticket": None,
+            "email_status": None,
+            "conversation_complete": False,
+            "error": None
+        }
     
     # Get the last user message
     messages = state.get("messages", [])
@@ -78,7 +100,14 @@ async def classify_intent_worker(state: AgentState, llm: ChatOpenAI) -> Dict[str
             intent = "other"
         
         print(f"[CLASSIFY_INTENT] Classified as: {intent}")
-        return {"intent": intent}
+        
+        result = {"intent": intent}
+        
+        # If we reset state due to conversation completion, include the reset
+        if conversation_complete:
+            result.update(state_reset)
+        
+        return result
     
     except Exception as e:
         print(f"Error in classify_intent_worker: {e}")
